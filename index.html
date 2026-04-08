@@ -50,7 +50,6 @@
     transform-style: preserve-3d;
     animation: spin 5s linear infinite;
   }
-  .card.paused { animation-play-state: paused; }
 
   @keyframes spin {
     from { transform: rotateY(0deg) rotateZ(-12deg); }
@@ -290,105 +289,55 @@
   }
   loop();
 
-  window.setSpeed = function(v) {
-    document.getElementById('spd').textContent = v;
-    const dur = ((11 - v) * 0.55 + 0.4).toFixed(2) + 's';
-    document.getElementById('card').style.animationDuration = dur;
-    document.querySelectorAll('.streak').forEach(el => el.style.animationDuration = dur);
-  };
-
-  // --- Click to pause/resume + drag to manually spin ---
+  // --- Hold to manually spin, release to resume ---
   const card = document.getElementById('card');
-  let isDragging = false;
+  let currentRotY = 0;
   let dragStartX = 0;
-  let currentRotY = 0;  // always tracks the latest known angle
-  let dragMoved = false;
-
-  function getAnimDuration() {
-    return parseFloat(getComputedStyle(card).animationDuration) || 3;
-  }
 
   function getComputedRotY() {
     const matrix = new DOMMatrixReadOnly(getComputedStyle(card).transform);
-    // atan2(m13, m11) gives rotateY angle
     return Math.atan2(-matrix.m31, matrix.m11) * (180 / Math.PI);
   }
 
-  function freezeCard() {
+  function onHoldStart(clientX) {
+    paused = true;
+    dragStartX = clientX;
     currentRotY = getComputedRotY();
     card.style.animation = 'none';
     card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
-  }
-
-  function resumeFromCurrent() {
-    const normalized = ((currentRotY % 360) + 360) % 360;
-    const dur = getAnimDuration();
-    const delay = -((normalized / 360) * dur);
-    // Apply delay then restore animation
-    card.style.transform = '';
-    card.style.animationDelay = delay + 's';
-    card.style.animation = `spin ${dur}s ${delay}s linear infinite`;
-  }
-
-  function enterManualMode(clientX) {
-    isDragging = true;
-    dragMoved = false;
-    dragStartX = clientX;
-    freezeCard();
-    paused = true;
     card.style.cursor = 'grabbing';
   }
 
-  function onDragMove(clientX) {
-    if (!isDragging) return;
+  function onHoldMove(clientX) {
+    if (!paused) return;
     const dx = clientX - dragStartX;
-    if (Math.abs(dx) > 3) dragMoved = true;
-    currentRotY += dx * 0.7;  // accumulate rotation
-    dragStartX = clientX;     // use delta each frame
+    dragStartX = clientX;
+    currentRotY += dx * 0.7;
     card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
   }
 
-  function endDrag() {
-    if (!isDragging) return;
-    isDragging = false;
-    card.style.cursor = 'pointer';
-
-    if (!dragMoved) {
-      // Plain click — resume auto-spin from current angle
-      paused = false;
-      resumeFromCurrent();
-      if (document.getElementById('btn')) {
-        document.getElementById('btn').textContent = '⏸ Pause';
-      }
-    }
-    // If dragged, stay frozen until next click
+  function onHoldEnd() {
+    if (!paused) return;
+    paused = false;
+    card.style.cursor = 'grab';
+    // Resume animation from the current angle using negative delay
+    const normalized = ((currentRotY % 360) + 360) % 360;
+    const dur = parseFloat(getComputedStyle(card).animationDuration) || 5;
+    const delay = -((normalized / 360) * dur);
+    card.style.transform = '';
+    card.style.animation = `spin ${dur}s ${delay}s linear infinite`;
   }
 
-  // Mouse events
-  card.addEventListener('mousedown', e => { e.preventDefault(); enterManualMode(e.clientX); });
-  window.addEventListener('mousemove', e => onDragMove(e.clientX));
-  window.addEventListener('mouseup', () => endDrag());
+  card.addEventListener('mousedown', e => { e.preventDefault(); onHoldStart(e.clientX); });
+  window.addEventListener('mousemove', e => onHoldMove(e.clientX));
+  window.addEventListener('mouseup', () => onHoldEnd());
 
-  // Touch events
-  card.addEventListener('touchstart', e => { e.preventDefault(); enterManualMode(e.touches[0].clientX); }, { passive: false });
-  window.addEventListener('touchmove', e => onDragMove(e.touches[0].clientX));
-  window.addEventListener('touchend', () => endDrag());
+  card.addEventListener('touchstart', e => { e.preventDefault(); onHoldStart(e.touches[0].clientX); }, { passive: false });
+  window.addEventListener('touchmove', e => onHoldMove(e.touches[0].clientX));
+  window.addEventListener('touchend', () => onHoldEnd());
 
-  card.style.cursor = 'pointer';
+  card.style.cursor = 'grab';
 
-  // Keep the existing button working too
-  window.toggle = function() {
-    if (isDragging) return;
-    paused = !paused;
-    if (paused) {
-      freezeCard();
-    } else {
-      resumeFromCurrent();
-    }
-    if (document.getElementById('btn')) {
-      document.getElementById('btn').textContent = paused ? '▶ Resume' : '⏸ Pause';
-    }
-  };
 </script>
 </body>
 </html>
