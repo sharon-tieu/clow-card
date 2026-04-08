@@ -336,25 +336,41 @@
   const card = document.getElementById('card');
   let isDragging = false;
   let dragStartX = 0;
-  let currentRotY = 0;
+  let currentRotY = 0;  // always tracks the latest known angle
   let dragMoved = false;
 
-  // Get current rotateY from the animation before pausing
-  function getCurrentRotY() {
-    const style = window.getComputedStyle(card);
-    const matrix = new DOMMatrixReadOnly(style.transform);
-    return Math.atan2(matrix.m13, matrix.m11) * (180 / Math.PI);
+  function getAnimDuration() {
+    return parseFloat(getComputedStyle(card).animationDuration) || 3;
+  }
+
+  function getComputedRotY() {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(card).transform);
+    // atan2(m13, m11) gives rotateY angle
+    return Math.atan2(-matrix.m31, matrix.m11) * (180 / Math.PI);
+  }
+
+  function freezeCard() {
+    currentRotY = getComputedRotY();
+    card.style.animation = 'none';
+    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
+  }
+
+  function resumeFromCurrent() {
+    const normalized = ((currentRotY % 360) + 360) % 360;
+    const dur = getAnimDuration();
+    const delay = -((normalized / 360) * dur);
+    // Apply delay then restore animation
+    card.style.transform = '';
+    card.style.animationDelay = delay + 's';
+    card.style.animation = `spin ${dur}s ${delay}s linear infinite`;
   }
 
   function enterManualMode(clientX) {
     isDragging = true;
     dragMoved = false;
     dragStartX = clientX;
-    currentRotY = getCurrentRotY();
+    freezeCard();
     paused = true;
-    // Fully remove the animation so it doesn't fight manual transforms
-    card.style.animation = 'none';
-    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
     card.style.cursor = 'grabbing';
   }
 
@@ -362,8 +378,9 @@
     if (!isDragging) return;
     const dx = clientX - dragStartX;
     if (Math.abs(dx) > 3) dragMoved = true;
-    const newRot = currentRotY + dx * 0.7;
-    card.style.transform = `rotateY(${newRot}deg) rotateZ(-12deg)`;
+    currentRotY += dx * 0.7;  // accumulate rotation
+    dragStartX = clientX;     // use delta each frame
+    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
   }
 
   function endDrag() {
@@ -372,15 +389,14 @@
     card.style.cursor = 'pointer';
 
     if (!dragMoved) {
-      // It was a plain click — resume auto-spin
+      // Plain click — resume auto-spin from current angle
       paused = false;
-      card.style.animation = '';
-      card.style.transform = '';
+      resumeFromCurrent();
       if (document.getElementById('btn')) {
         document.getElementById('btn').textContent = '⏸ Pause';
       }
     }
-    // If it was a drag, leave it frozen at current position until next click
+    // If dragged, stay frozen until next click
   }
 
   // Mouse events
@@ -400,12 +416,9 @@
     if (isDragging) return;
     paused = !paused;
     if (paused) {
-      currentRotY = getCurrentRotY();
-      card.style.animation = 'none';
-      card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
+      freezeCard();
     } else {
-      card.style.animation = '';
-      card.style.transform = '';
+      resumeFromCurrent();
     }
     if (document.getElementById('btn')) {
       document.getElementById('btn').textContent = paused ? '▶ Resume' : '⏸ Pause';
