@@ -48,12 +48,6 @@
     height: 100%;
     position: relative;
     transform-style: preserve-3d;
-    animation: spin 5s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotateY(0deg) rotateZ(-12deg); }
-    to   { transform: rotateY(360deg) rotateZ(-12deg); }
   }
 
   .face {
@@ -289,52 +283,53 @@
   }
   loop();
 
-  // --- Hold to manually spin, release to resume ---
+  // --- JS-driven spin: consistent speed, hold to drag ---
   const card = document.getElementById('card');
-  let currentRotY = 0;
+  const DEG_PER_MS = 360 / 5000; // one full rotation every 5 seconds
+  let rotY = 0;
+  let holding = false;
   let dragStartX = 0;
 
-  function getComputedRotY() {
-    const matrix = new DOMMatrixReadOnly(getComputedStyle(card).transform);
-    return Math.atan2(-matrix.m31, matrix.m11) * (180 / Math.PI);
+  let prevTs = null;
+
+  function spinLoop(ts) {
+    if (!holding) {
+      if (prevTs !== null) rotY += DEG_PER_MS * (ts - prevTs);
+      card.style.transform = `rotateY(${rotY}deg) rotateZ(-12deg)`;
+    }
+    prevTs = holding ? null : ts;
+    requestAnimationFrame(spinLoop);
   }
+  requestAnimationFrame(spinLoop);
 
   function onHoldStart(clientX) {
-    paused = true;
+    holding = true;
     dragStartX = clientX;
-    currentRotY = getComputedRotY();
-    card.style.animation = 'none';
-    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
     card.style.cursor = 'grabbing';
   }
 
   function onHoldMove(clientX) {
-    if (!paused) return;
+    if (!holding) return;
     const dx = clientX - dragStartX;
     dragStartX = clientX;
-    currentRotY += dx * 0.7;
-    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
+    rotY += dx * 0.7;
+    card.style.transform = `rotateY(${rotY}deg) rotateZ(-12deg)`;
   }
 
   function onHoldEnd() {
-    if (!paused) return;
-    paused = false;
+    if (!holding) return;
+    holding = false;
     card.style.cursor = 'grab';
-    // Resume animation from the current angle using negative delay
-    const normalized = ((currentRotY % 360) + 360) % 360;
-    const dur = parseFloat(getComputedStyle(card).animationDuration) || 5;
-    const delay = -((normalized / 360) * dur);
-    card.style.transform = '';
-    card.style.animation = `spin ${dur}s ${delay}s linear infinite`;
   }
 
-  card.addEventListener('mousedown', e => { e.preventDefault(); onHoldStart(e.clientX); });
-  window.addEventListener('mousemove', e => onHoldMove(e.clientX));
-  window.addEventListener('mouseup', () => onHoldEnd());
-
-  card.addEventListener('touchstart', e => { e.preventDefault(); onHoldStart(e.touches[0].clientX); }, { passive: false });
-  window.addEventListener('touchmove', e => onHoldMove(e.touches[0].clientX));
-  window.addEventListener('touchend', () => onHoldEnd());
+  card.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    card.setPointerCapture(e.pointerId);
+    onHoldStart(e.clientX);
+  });
+  card.addEventListener('pointermove', e => onHoldMove(e.clientX));
+  card.addEventListener('pointerup', () => onHoldEnd());
+  card.addEventListener('pointercancel', () => onHoldEnd());
 
   card.style.cursor = 'grab';
 
