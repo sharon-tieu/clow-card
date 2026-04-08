@@ -48,7 +48,7 @@
     height: 100%;
     position: relative;
     transform-style: preserve-3d;
-    animation: spin 3s linear infinite;
+    animation: spin 5s linear infinite;
   }
   .card.paused { animation-play-state: paused; }
 
@@ -136,33 +136,6 @@
     50%      { opacity:0.6; transform: scale(1); }
   }
 
-  .controls {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-  }
-  button {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 999px;
-    padding: 8px 28px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  button:hover { background: rgba(255,255,255,0.2); }
-  .speed-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: rgba(255,255,255,0.7);
-    font-size: 13px;
-  }
-  input[type=range] { width: 130px; accent-color: #f472b6; }
 </style>
 </head>
 <body>
@@ -188,14 +161,6 @@
   <canvas id="sparkleAbove"></canvas>
 </div>
 
-<div class="controls">
-  <button id="btn" onclick="toggle()">⏸ Pause</button>
-  <div class="speed-row">
-    <span>Speed</span>
-    <input type="range" min="1" max="10" value="5" step="1" oninput="setSpeed(this.value)" />
-    <span id="spd">5</span>
-  </div>
-</div>
 
 <script>
   // background stars
