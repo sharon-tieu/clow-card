@@ -316,7 +316,6 @@
 
   function loop() {
     if (!paused) {
-      // spawn into both layers
       if (Math.random() < 0.3) sparklesBelow.push(makeSparkle('below'));
       if (Math.random() < 0.35) sparklesAbove.push(makeSparkle('above'));
     }
@@ -326,17 +325,91 @@
   }
   loop();
 
-  window.toggle = function() {
-    paused = !paused;
-    document.getElementById('card').classList.toggle('paused', paused);
-    document.getElementById('btn').textContent = paused ? '▶ Resume' : '⏸ Pause';
-  };
-
   window.setSpeed = function(v) {
     document.getElementById('spd').textContent = v;
     const dur = ((11 - v) * 0.55 + 0.4).toFixed(2) + 's';
     document.getElementById('card').style.animationDuration = dur;
     document.querySelectorAll('.streak').forEach(el => el.style.animationDuration = dur);
+  };
+
+  // --- Click to pause/resume + drag to manually spin ---
+  const card = document.getElementById('card');
+  let isDragging = false;
+  let dragStartX = 0;
+  let currentRotY = 0;
+  let dragMoved = false;
+
+  // Get current rotateY from the animation before pausing
+  function getCurrentRotY() {
+    const style = window.getComputedStyle(card);
+    const matrix = new DOMMatrixReadOnly(style.transform);
+    return Math.atan2(matrix.m13, matrix.m11) * (180 / Math.PI);
+  }
+
+  function enterManualMode(clientX) {
+    isDragging = true;
+    dragMoved = false;
+    dragStartX = clientX;
+    currentRotY = getCurrentRotY();
+    paused = true;
+    // Fully remove the animation so it doesn't fight manual transforms
+    card.style.animation = 'none';
+    card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
+    card.style.cursor = 'grabbing';
+  }
+
+  function onDragMove(clientX) {
+    if (!isDragging) return;
+    const dx = clientX - dragStartX;
+    if (Math.abs(dx) > 3) dragMoved = true;
+    const newRot = currentRotY + dx * 0.7;
+    card.style.transform = `rotateY(${newRot}deg) rotateZ(-12deg)`;
+  }
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    card.style.cursor = 'pointer';
+
+    if (!dragMoved) {
+      // It was a plain click — resume auto-spin
+      paused = false;
+      card.style.animation = '';
+      card.style.transform = '';
+      if (document.getElementById('btn')) {
+        document.getElementById('btn').textContent = '⏸ Pause';
+      }
+    }
+    // If it was a drag, leave it frozen at current position until next click
+  }
+
+  // Mouse events
+  card.addEventListener('mousedown', e => { e.preventDefault(); enterManualMode(e.clientX); });
+  window.addEventListener('mousemove', e => onDragMove(e.clientX));
+  window.addEventListener('mouseup', () => endDrag());
+
+  // Touch events
+  card.addEventListener('touchstart', e => { e.preventDefault(); enterManualMode(e.touches[0].clientX); }, { passive: false });
+  window.addEventListener('touchmove', e => onDragMove(e.touches[0].clientX));
+  window.addEventListener('touchend', () => endDrag());
+
+  card.style.cursor = 'pointer';
+
+  // Keep the existing button working too
+  window.toggle = function() {
+    if (isDragging) return;
+    paused = !paused;
+    if (paused) {
+      currentRotY = getCurrentRotY();
+      card.style.animation = 'none';
+      card.style.transform = `rotateY(${currentRotY}deg) rotateZ(-12deg)`;
+    } else {
+      card.style.animation = '';
+      card.style.transform = '';
+    }
+    if (document.getElementById('btn')) {
+      document.getElementById('btn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+    }
   };
 </script>
 </body>
